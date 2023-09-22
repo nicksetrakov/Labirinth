@@ -49,22 +49,6 @@ class Game:
             except MaxHeroesError as e:
                 print(e)
 
-    @staticmethod
-    def attack(attack_hero, damage_hero):
-        """
-        Perform an attack between two heroes.
-
-        Args:
-            attack_hero (Hero): The hero performing the attack.
-            damage_hero (Hero): The hero receiving the damage.
-
-        Logs the attack action and decreases the health of the damage_hero.
-        """
-
-        logger.info(f'Герой {attack_hero.name} дістав меч та наніс удар {damage_hero.name}.'
-                    f' В результаті чого {damage_hero.name} втратив одне життя')
-        damage_hero.health -= 1
-
     def check_hero_health(self, current_hero):
         """
                 Check the health of a hero.
@@ -96,7 +80,7 @@ class Game:
                 """
         logger.info('Перевірка чи знаходиться герой з кимось або чимось в клітині')
         near_heroes = []
-        action = ['Ходити']
+        action = []
 
         for near_hero in self.heroes:
             if hero.position == near_hero.position and hero.name != near_hero.name and near_hero.health > 0:
@@ -116,62 +100,7 @@ class Game:
 
         else:
             logger.info('Поряд немає предметів')
-
-        action.append('Самолікування')
-        action.append('Зберегти гру')
-        action.append('Вихід з гри')
-
-        while True:
-            print(f'Виберіть дію для героя {hero.name}:')
-            for i, act in enumerate(action):
-                print(f"{i + 1}. {act}")
-            try:
-                choice_num = int(input('Введіть номер дії: '))
-                if 1 <= choice_num <= len(action):
-                    selected_action = action[choice_num - 1]
-
-                    if 'Атакувати мечем' in selected_action:
-                        logger.info(
-                            f'Герой {hero.name} зібрався атакувати {near_heroes[choice_num - 2].name}')
-                        self.attack(hero, near_heroes[choice_num - 2])
-                        return True
-                    elif selected_action == 'Підібрати ключ':
-                        logger.info(f'Герой {hero.name} підібрав ключ')
-                        hero.has_key = True
-                        self.labyrinth.key = False
-                        return True
-                    elif selected_action == 'Поповнити життя':
-                        if hero.health == 5:
-                            logger.info(f'Герой {hero.name} має повне життя')
-                        else:
-                            logger.info(f'Герой {hero.name} поповнив життя')
-                            hero.health = 5
-                            return True
-                    elif selected_action == 'Ходити':
-                        if self.hero_move(hero):
-                            return True
-                        else:
-                            return False
-                    elif selected_action == 'Самолікування':
-                        if self.self_heal(hero):
-                            return True
-                        else:
-                            return False
-
-                    elif selected_action == 'Зберегти гру':
-                        self.save_game()
-                        logger.info('Гра успішно збережена')
-                        return False
-
-                    elif selected_action == 'Вихід з гри':
-                        logger.info('Ви завершили гру')
-                        exit()
-                else:
-                    print('Неправильний ввід. Будь ласка, введіть номер дії або "NO".')
-                    continue
-
-            except ValueError:
-                print('Неправильний ввід. Будь ласка, введіть номер дії або "NO".')
+        return action, near_heroes
 
     def check_save(self):
         """
@@ -315,7 +244,8 @@ class Game:
 
                 This method handles the game's rounds, hero turns, and game-over conditions.
                 """
-        self.start_new_round()
+        if not self.current_turn:
+            self.start_new_round()
         while True:
             if self.heroes:
                 current_hero = self.heroes[self.current_turn]
@@ -323,7 +253,8 @@ class Game:
                 logger.info(f'Кількість здоров`я героя: {current_hero.health}')
                 if self.check_hero_health(current_hero):
                     while True:
-                        if self.check_near_hero(current_hero):
+                        action, near_heroes = self.check_near_hero(current_hero)
+                        if current_hero.hero_action(action, near_heroes):
                             if self.check_hero_health(current_hero):
                                 self.current_turn = (self.current_turn + 1) % len(self.heroes)
                                 if not self.current_turn and self.heroes:
@@ -366,31 +297,6 @@ class Game:
 
         with open("game_save.json", "w") as save_file:
             json.dump(all_game_saves, save_file, indent=4, sort_keys=True)
-
-    @staticmethod
-    def self_heal(current_hero):
-        """
-                Allow the hero to heal themselves.
-
-                Args:
-                    current_hero (Hero): The hero who wants to heal.
-
-                Returns:
-                    bool: True if the hero successfully healed, False otherwise.
-                """
-        logger.info(f'Герой {current_hero.name} дістав аптечку, щоб поповнити здоров`є')
-        if current_hero.count_heal > 0:
-            if current_hero.health != 5:
-                current_hero.health += 1
-                current_hero.count_heal -= 1
-                logger.info(f'Герой {current_hero.name} вилікувався, зараз він має: {current_hero.health} здоров`я')
-                return True
-            else:
-                logger.info(f'Герой {current_hero.name} має повне здоров`я')
-                return False
-        else:
-            logger.info('Аптечка виявилась порожньою, герой не має більше змоги лікуватись')
-            return False
 
     def start_new_round(self):
         """
@@ -462,10 +368,6 @@ class Labyrinth:
             return self.grid[y][x] in [1, 2]
         return False
 
-    def process_hero_action(self, hero, action):
-        # Process the hero's action (not implemented yet)
-        pass
-
     def to_dict(self):
         """
         Convert Labyrinth data to a dictionary for saving.
@@ -515,6 +417,172 @@ class Hero:
         self.position = (3, 0)
         self.prev_position = (0, 0)
         self.count_heal = 3
+
+    def attack(self, damage_hero):
+        """
+        Perform an attack between two heroes.
+
+        Args:
+            damage_hero (Hero): The hero receiving the damage.
+
+        Logs the attack action and decreases the health of the damage_hero.
+        """
+
+        logger.info(f'Герой {self.name} дістав меч та наніс удар {damage_hero.name}.'
+                    f' В результаті чого {damage_hero.name} втратив одне життя')
+        damage_hero.health -= 1
+
+    def hero_action(self, action, near_heroes):
+
+        static_action = ['Перемістити героя', 'Самолікування', 'Зберегти гру', 'Вихід з гри']
+        action += static_action
+
+        while True:
+            print(f'Виберіть дію для героя {self.name}:')
+            for i, act in enumerate(action):
+                print(f"{i + 1}. {act}")
+            try:
+                choice_num = int(input('Введіть номер дії: '))
+                if 1 <= choice_num <= len(action):
+                    selected_action = action[choice_num - 1]
+
+                    if 'Атакувати мечем' in selected_action:
+                        logger.info(
+                            f'Герой {self.name} зібрався атакувати {near_heroes[choice_num - 1].name}')
+                        self.attack(near_heroes[choice_num - 1])
+                        return True
+                    elif selected_action == 'Підібрати ключ':
+                        logger.info(f'Герой {self.name} підібрав ключ')
+                        self.has_key = True
+                        game.labyrinth.key = False
+                        return True
+                    elif selected_action == 'Поповнити життя':
+                        if self.health == 5:
+                            logger.info(f'Герой {self.name} має повне життя')
+                        else:
+                            logger.info(f'Герой {self.name} поповнив життя')
+                            self.health = 5
+                            return True
+                    elif selected_action == 'Перемістити героя':
+                        if self.hero_move():
+                            return True
+                        else:
+                            return False
+                    elif selected_action == 'Самолікування':
+                        if self.self_heal():
+                            return True
+                        else:
+                            return False
+
+                    elif selected_action == 'Зберегти гру':
+                        game.save_game()
+                        logger.info('Гра успішно збережена')
+                        return False
+
+                    elif selected_action == 'Вихід з гри':
+                        logger.info('Ви завершили гру')
+                        exit()
+                else:
+                    print('Неправильний ввід. Будь ласка, введіть номер дії або "NO".')
+                    continue
+
+            except ValueError:
+                print('Неправильний ввід. Будь ласка, введіть номер дії або "NO".')
+
+    def hero_move(self):
+        """
+                Allow the hero to move in different directions.
+
+                Returns:
+                    bool: True if the hero successfully moved, False otherwise.
+                """
+        new_x, new_y = 0, 0
+        while True:
+            x, y = self.position
+            action = ['Вгору', 'Вниз', 'Вліво', 'Вправо']
+            print('Виберіть напрямок: ')
+            for i, act in enumerate(action):
+                print(f'{i + 1}. {act}')
+            choice = input('Введіть номер напрямку або "NO" для відмови: ')
+            choice = choice.strip().upper()
+
+            if choice == 'NO':
+                logger.info(f'Герой {self.name} не вибрав жодного напрямку')
+                return False
+            try:
+                choice_num = int(choice)
+                if 1 <= choice_num <= len(action):
+                    selected_action = action[choice_num - 1]
+                    if selected_action == "Вгору":
+                        new_x, new_y = x - 1, y
+                    elif selected_action == "Вниз":
+                        new_x, new_y = x + 1, y
+                    elif selected_action == "Вліво":
+                        new_x, new_y = x, y - 1
+                    elif selected_action == "Вправо":
+                        new_x, new_y = x, y + 1
+                    else:
+                        print("Некорректний напрямок. Спробуйте ще раз.")
+                        continue
+                    break
+            except ValueError:
+                print('Неправильний ввід. Будь ласка, введіть номер дії або "NO".')
+        if 0 <= x < 4 and 0 <= y < 8 and game.labyrinth.grid[new_x][new_y]:
+            if game.labyrinth.grid[new_x][new_y] == 1:
+                if (new_x, new_y) == self.prev_position:
+                    while True:
+                        logger.info(f'Герой {self.name} злякався та хоче повернутись назад')
+                        action = input(
+                            'Ви впевнені? Ваш герой помре(Відповідь: yes/no').strip().lower()
+                        if action == 'yes':
+                            self.health = 0
+                            return True
+                        elif action == 'no':
+                            return False
+                self.prev_position = self.position
+            self.position = (new_x, new_y)
+            logger.info(f'Герой {self.name} перемістився у клітину {self.position}')
+            game.check_near_hero(self)
+            if self.position in game.fire_cells:
+                logger.info(
+                    f'Герой {self.name} потрапив у клітину яка зайнялась полум`ям та втратив одне життя')
+                self.health -= 1
+            if self.position == game.labyrinth.golem_coord:
+                logger.info(f'Герой {self.name} зустрів Голема')
+                if self.has_key:
+                    logger.info(f'Герой {self.name} відав ключ Голему и тот його пропустив далі')
+                    logger.info(f'Герой {self.name} отримав перемогу в цій грі')
+                    exit()
+                else:
+                    logger.info(f'У Героя  {self.name} не виявилося ключа для Голема, тому він його атакував.')
+                    self.health = 0
+
+        else:
+            logger.info(f'Герой {self.name} врізався у стіну та втрачає одне життя')
+            self.health -= 1
+        return True
+
+    def self_heal(self):
+        """
+                Allow the hero to heal themselves.
+
+
+                Returns:
+                    bool: True if the hero successfully healed, False otherwise.
+                """
+        logger.info(f'Герой {self.name} дістав аптечку, щоб поповнити здоров`є')
+        if self.count_heal > 0:
+            if self.health != 5:
+                self.health += 1
+                self.count_heal -= 1
+                logger.info(f'Герой {self.name} вилікувався, зараз він має: {self.health} здоров`я')
+                return True
+            else:
+                logger.info(f'Герой {self.name} має повне здоров`я')
+                return False
+        else:
+            logger.info('Аптечка виявилась порожньою, герой не має більше змоги лікуватись')
+            return False
 
     def to_dict(self):
         """
