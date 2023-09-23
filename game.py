@@ -70,41 +70,6 @@ class Game:
             except MaxHeroesError as e:
                 print(e)
 
-    def check_near_hero(self, hero):
-        """
-        Check if there are other heroes or items near the given hero's position.
-
-        Args:
-            hero (Hero): The hero to check for nearby entities.
-
-        Returns:
-            Tuple[list, list]: A tuple containing a list of available actions and a list of nearby heroes.
-        """
-
-        logger.info('Перевірка чи знаходиться герой з кимось або чимось в клітині')
-        near_heroes = []
-        action = []
-
-        for near_hero in self.heroes:
-            if hero.position == near_hero.position and hero.name != near_hero.name and near_hero.health > 0:
-                logger.info(f'Герой {hero.name} знаходиться в одній клітинці з іншим героєм - {near_hero.name}')
-                near_heroes.append(near_hero)
-                action.append(f'Атакувати мечем {near_hero.name}')
-        if not near_heroes:
-            logger.info('Поряд немає героїв')
-
-        if self.labyrinth.key and hero.position == self.labyrinth.key_coord:
-            logger.info(f'Герой {hero.name} знаходиться в одній клітинці з ключем та може його підібрати')
-            action.append('Підібрати ключ')
-
-        elif hero.position in self.labyrinth.hearts_coords:
-            logger.info(f'Герой {hero.name} знаходиться в одній клітинці з сердцем та може поповнити свої життя')
-            action.append('Поповнити життя')
-
-        else:
-            logger.info('Поряд немає предметів')
-        return action, near_heroes
-
     def check_save(self):
         """
         Check if a saved game exists for the current login.
@@ -191,7 +156,7 @@ class Game:
                 logger.info(f'Кількість здоров`я героя: {current_hero.health}')
                 if current_hero.check_hero_health():
                     while True:
-                        action, near_heroes = self.check_near_hero(current_hero)
+                        action, near_heroes = current_hero.check_near_hero()
                         if current_hero.hero_action(action, near_heroes):
                             if current_hero.check_hero_health():
                                 self.current_turn = (self.current_turn + 1) % len(self.heroes)
@@ -424,6 +389,38 @@ class Hero:
             return False
         return True
 
+    def check_near_hero(self):
+        """
+        Check if there are other heroes or items near the given hero's position.
+
+        Returns:
+            Tuple[list, list]: A tuple containing a list of available actions and a list of nearby heroes.
+        """
+
+        logger.info('Перевірка чи знаходиться герой з кимось або чимось в клітині')
+        near_heroes = []
+        action = []
+
+        for near_hero in game.heroes:
+            if self.position == near_hero.position and self.name != near_hero.name and near_hero.health > 0:
+                logger.info(f'Герой {self.name} знаходиться в одній клітинці з іншим героєм - {near_hero.name}')
+                near_heroes.append(near_hero)
+                action.append(f'Атакувати мечем {near_hero.name}')
+        if not near_heroes:
+            logger.info('Поряд немає героїв')
+
+        if game.labyrinth.key and self.position == game.labyrinth.key_coord:
+            logger.info(f'Герой {self.name} знаходиться в одній клітинці з ключем та може його підібрати')
+            action.append('Підібрати ключ')
+
+        elif self.position in game.labyrinth.hearts_coords:
+            logger.info(f'Герой {self.name} знаходиться в одній клітинці з сердцем та може поповнити свої життя')
+            action.append('Поповнити життя')
+
+        else:
+            logger.info('Поряд немає предметів')
+        return action, near_heroes
+
     def hero_action(self, action, near_heroes):
         """
         Allow the hero to take action during their turn in the game.
@@ -557,7 +554,7 @@ class Hero:
                 self.prev_position = self.position
             self.position = (new_x, new_y)
             logger.info(f'Герой {self.name} перемістився у клітину {self.position}')
-            game.check_near_hero(self)
+            self.check_near_hero()
             if self.position in game.fire_cells:
                 logger.info(
                     f'Герой {self.name} потрапив у клітину яка зайнялась полум`ям та втратив одне життя')
