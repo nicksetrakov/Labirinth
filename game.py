@@ -9,25 +9,46 @@ logger = logging.getLogger(__name__)
 
 class Game:
     """
+    Represents a game instance.
+
+    Attributes:
+        heroes (list): A list to store hero objects.
+        round (int): The current round number.
+        current_turn (int): Index of the current hero's turn.
+        player_login (str): The player's login name.
+        fire_cells (list): Coordinates of cells with fire.
+        labyrinth (Labyrinth): An instance of the Labyrinth class representing the game's maze.
+    """
+
+    def __init__(self, login):
+        """
         Initialize the game.
 
         Args:
             login (str): The player's login name.
         """
-
-    def __init__(self, login):
-        self.heroes = []  # List to store hero objects
-        self.round = 0  # Current round number
-        self.current_turn = 0  # Index of the current hero's turn
-        self.player_login = login  # Player's login
-        self.fire_cells = []  # Coordinates of cells with fire
-        self.labyrinth = Labyrinth()  # Initialize the labyrinth
+        self.heroes = []
+        self.round = 0
+        self.current_turn = 0
+        self.player_login = login
+        self.fire_cells = []
+        self.labyrinth = Labyrinth()
 
     def add_heroes(self):
         """
-        Add heroes to the game.
+    Add heroes to the game.
 
-        Asks the user for the number of heroes and their names, then adds them to the game.
+    This function prompts the user for the number of heroes and their names, then adds them to the game.
+
+    Raises:
+        MaxHeroesError: If the user enters a number of heroes greater than 5.
+
+    Note:
+        - The function keeps asking for input until a valid number of heroes is provided.
+        - It also ensures that each hero has a unique name.
+
+    Returns:
+        None
         """
         while True:
             try:
@@ -49,35 +70,17 @@ class Game:
             except MaxHeroesError as e:
                 print(e)
 
-    def check_hero_health(self, current_hero):
-        """
-                Check the health of a hero.
-
-                Args:
-                    current_hero (Hero): The hero to check.
-
-                Returns:
-                    bool: True if the hero is alive, False if the hero has no remaining lives.
-                """
-        if current_hero.health <= 0:
-            logger.info(f'На жаль  герой {current_hero.name} отримав не сумістні з життям поранення та загинув')
-            if current_hero.has_key:
-                logger.info(f'З {current_hero.name} випав ключ за координатами {current_hero.position}')
-                self.labyrinth.key = True
-                self.labyrinth.key_coord = current_hero.position
-            return False
-        return True
-
     def check_near_hero(self, hero):
         """
-                Check if there are other heroes or items near the given hero's position.
+        Check if there are other heroes or items near the given hero's position.
 
-                Args:
-                    hero (Hero): The hero to check for nearby entities.
+        Args:
+            hero (Hero): The hero to check for nearby entities.
 
-                Returns:
-                    bool: True if there are actions available, False if not.
-                """
+        Returns:
+            Tuple[list, list]: A tuple containing a list of available actions and a list of nearby heroes.
+        """
+
         logger.info('Перевірка чи знаходиться герой з кимось або чимось в клітині')
         near_heroes = []
         action = []
@@ -104,11 +107,12 @@ class Game:
 
     def check_save(self):
         """
-                Check if a saved game exists for the current login.
+        Check if a saved game exists for the current login.
 
-                Returns:
-                    bool: True if a saved game exists, False otherwise.
-                """
+        Returns:
+            bool: True if a saved game exists, False otherwise.
+        """
+
         logger.info('Перевіряємо наявність збереженої гри.')
         try:
             with open("game_save.json", "r") as save_file:
@@ -139,88 +143,14 @@ class Game:
             logging.warning('Файл game_save.json пустий або містить некоректні дані.')
             return False
 
-    def hero_move(self, current_hero):
-        """
-                Allow the hero to move in different directions.
-
-                Args:
-                    current_hero (Hero): The hero to move.
-
-                Returns:
-                    bool: True if the hero successfully moved, False otherwise.
-                """
-        new_x, new_y = 0, 0
-        while True:
-            x, y = current_hero.position
-            action = ['Вгору', 'Вниз', 'Вліво', 'Вправо']
-            print('Виберіть напрямок: ')
-            for i, act in enumerate(action):
-                print(f'{i + 1}. {act}')
-            choice = input('Введіть номер напрямку або "NO" для відмови: ')
-            choice = choice.strip().upper()
-
-            if choice == 'NO':
-                logger.info(f'Герой {current_hero.name} не вибрав жодного напрямку')
-                return False
-            try:
-                choice_num = int(choice)
-                if 1 <= choice_num <= len(action):
-                    selected_action = action[choice_num - 1]
-                    if selected_action == "Вгору":
-                        new_x, new_y = x - 1, y
-                    elif selected_action == "Вниз":
-                        new_x, new_y = x + 1, y
-                    elif selected_action == "Вліво":
-                        new_x, new_y = x, y - 1
-                    elif selected_action == "Вправо":
-                        new_x, new_y = x, y + 1
-                    else:
-                        print("Некорректний напрямок. Спробуйте ще раз.")
-                        continue
-                    break
-            except ValueError:
-                print('Неправильний ввід. Будь ласка, введіть номер дії або "NO".')
-        if 0 <= x < 4 and 0 <= y < 8 and self.labyrinth.grid[new_x][new_y]:
-            if self.labyrinth.grid[new_x][new_y] == 1:
-                if (new_x, new_y) == current_hero.prev_position:
-                    while True:
-                        logger.info(f'Герой {current_hero.name} злякався та хоче повернутись назад')
-                        action = input(
-                            'Ви впевнені? Ваш герой помре(Відповідь: yes/no').strip().lower()
-                        if action == 'yes':
-                            current_hero.health = 0
-                            return True
-                        elif action == 'no':
-                            return False
-                current_hero.prev_position = current_hero.position
-            current_hero.position = (new_x, new_y)
-            logger.info(f'Герой {current_hero.name} перемістився у клітину {current_hero.position}')
-            if current_hero.position in self.fire_cells:
-                logger.info(
-                    f'Герой {current_hero.name} потрапив у клітину яка зайнялась полум`ям та втратив одне життя')
-                current_hero.health -= 1
-            if current_hero.position == self.labyrinth.golem_coord:
-                logger.info(f'Герой {current_hero.name} зустрів Голема')
-                if current_hero.has_key:
-                    logger.info(f'Герой {current_hero.name} відав ключ Голему и тот його пропустив далі')
-                    logger.info(f'Герой {current_hero.name} отримав перемогу в цій грі')
-                    exit()
-                else:
-                    logger.info(f'У Героя  {current_hero.name} не виявилося ключа для Голема, тому він його атакував.')
-                    current_hero.health = 0
-
-        else:
-            logger.info(f'Герой {current_hero.name} врізався у стіну та втрачає одне життя')
-            current_hero.health -= 1
-        return True
-
     def load_game(self):
         """
-                Load a saved game from a JSON file.
+        Load a saved game from a JSON file.
 
-                This method loads a saved game state, including hero details, current round, and labyrinth state,
-                 from a JSON file.
-                """
+        This method loads a saved game state, including hero details, current round, and labyrinth state,
+         from a JSON file.
+        """
+
         try:
             with open("game_save.json", "r") as save_file:
                 all_game_saves = json.load(save_file)
@@ -240,10 +170,18 @@ class Game:
 
     def play(self):
         """
-                Start and manage the game loop.
+    Start and manage the game loop.
 
-                This method handles the game's rounds, hero turns, and game-over conditions.
-                """
+    This method handles the game's rounds, hero turns, and game-over conditions.
+
+    It starts a new round if the current turn is not set. The game loop continues until there are heroes left in the
+    game. During each iteration of the loop, the current hero takes their turn. If the hero's health reaches zero or
+    below, they are removed from the game. If all heroes are eliminated, the game ends.
+
+    Returns:
+        None
+    """
+
         if not self.current_turn:
             self.start_new_round()
         while True:
@@ -251,11 +189,11 @@ class Game:
                 current_hero = self.heroes[self.current_turn]
                 logger.info(f"Зараз ходить герой з ім'ям {current_hero.name}")
                 logger.info(f'Кількість здоров`я героя: {current_hero.health}')
-                if self.check_hero_health(current_hero):
+                if current_hero.check_hero_health():
                     while True:
                         action, near_heroes = self.check_near_hero(current_hero)
                         if current_hero.hero_action(action, near_heroes):
-                            if self.check_hero_health(current_hero):
+                            if current_hero.check_hero_health():
                                 self.current_turn = (self.current_turn + 1) % len(self.heroes)
                                 if not self.current_turn and self.heroes:
                                     self.start_new_round()
@@ -274,11 +212,18 @@ class Game:
 
     def save_game(self):
         """
-                Save the current game state to a JSON file.
+        Save the current game state to a JSON file.
 
-                This method saves the game's data, including hero details, current round, and labyrinth state, to a JSON
-                 file.
-                """
+        This method saves the game's data, including hero details, current round, and labyrinth state, to a JSON file.
+        The saved data is organized in a dictionary
+
+        The saved data is then appended to a JSON file named "game_save.json" under a key corresponding to the player's
+        login.
+
+        Returns:
+            None
+        """
+
         game_data = {
             "heroes": [hero.to_dict() for hero in self.heroes],
             "round": self.round,
@@ -304,7 +249,10 @@ class Game:
 
         This method increments the round counter and updates the labyrinth, fire cells,
          and golem position for the new round.
+
+         Returns: None
         """
+
         self.round += 1
         self.labyrinth.generate_fire()
         self.fire_cells = self.labyrinth.fire_coords
@@ -321,12 +269,28 @@ class MaxHeroesError(Exception):
 
 
 class Labyrinth:
+    """
+    Attributes:
+            size_x (int): The width of the labyrinth grid.
+            size_y (int): The height of the labyrinth grid.
+            grid (list): A 2D list representing the labyrinth's layout.
+            key (bool): Indicates whether the key is present in the labyrinth.
+            key_coord (tuple): Coordinates of the key (x, y) in the grid.
+            hearts_coords (list): List of heart coordinates (x, y) in the grid.
+            golem_coord (tuple): Coordinates of the golem (x, y) in the grid.
+            fire_coords (list): List of coordinates (x, y) where fire is present in the grid.
+    """
     def __init__(self):
         """
         Initialize the Labyrinth with its properties.
 
         The Labyrinth consists of a grid, key, heart coordinates, and golem coordinate.
+
+
+        Returns:
+            None
         """
+
         self.size_x = 4
         self.size_y = 8
         self.grid = [
@@ -346,7 +310,10 @@ class Labyrinth:
         Generate the coordinates of fire cells.
 
         This method randomly selects four valid cells to set on fire within the Labyrinth.
+        Returns:
+            None
         """
+
         self.fire_coords = []
         while len(self.fire_coords) != 4:
             x, y = random.randint(0, self.size_x - 1), random.randint(0, self.size_y - 1)
@@ -404,6 +371,15 @@ class Labyrinth:
 
 
 class Hero:
+    """
+    Attributes:
+            name (str): The name of the Hero.
+            health (int): The current health points of the Hero.
+            has_key (bool): Indicates whether the Hero has a key.
+            position (tuple): The current position of the Hero as (x, y) coordinates.
+            prev_position (tuple): The previous position of the Hero as (x, y) coordinates.
+            count_heal (int): The remaining count of healing items the Hero possesses.
+    """
     def __init__(self, name):
         """
         Initialize a Hero with its properties.
@@ -432,7 +408,39 @@ class Hero:
                     f' В результаті чого {damage_hero.name} втратив одне життя')
         damage_hero.health -= 1
 
+    def check_hero_health(self):
+        """
+        Check the health of a hero.
+
+        Returns:
+            bool: True if the hero is alive, False if the hero has no remaining lives.
+        """
+        if self.health <= 0:
+            logger.info(f'На жаль  герой {self.name} отримав не сумістні з життям поранення та загинув')
+            if self.has_key:
+                logger.info(f'З {self.name} випав ключ за координатами {self.position}')
+                game.labyrinth.key = True
+                game.labyrinth.key_coord = self.position
+            return False
+        return True
+
     def hero_action(self, action, near_heroes):
+        """
+        Allow the hero to take action during their turn in the game.
+
+        Args:
+            action (list): A list of available actions the hero can take.
+            near_heroes (list): A dictionary mapping hero indices to nearby heroes.
+
+        Returns:
+            bool: True if the hero successfully took an action, False if they chose to exit the game.
+
+        This function presents the hero with a menu of available actions, including moving, attacking, healing, saving
+        the game, or exiting the game. The hero selects an action by entering the corresponding number,
+        and the function performs the chosen action. It handles various actions such as attacking other heroes,
+        picking up keys, healing, moving the hero within the labyrinth, saving the game, or exiting the game.
+
+        """
 
         static_action = ['Перемістити героя', 'Самолікування', 'Зберегти гру', 'Вихід з гри']
         action += static_action
@@ -491,11 +499,18 @@ class Hero:
 
     def hero_move(self):
         """
-                Allow the hero to move in different directions.
+    Allow the hero to move in different directions within the labyrinth.
 
-                Returns:
-                    bool: True if the hero successfully moved, False otherwise.
-                """
+    Returns:
+        bool: True if the hero successfully moved, False otherwise.
+
+    This function allows the hero to select a direction (up, down, left, or right) to move within the labyrinth.
+    It presents the hero with a menu of available directions and handles the movement logic.
+    The hero's position is updated if the move is valid, and various events are checked, such as encountering fire,
+    a golem, or hitting a wall.
+    The function returns True if the hero successfully moved and False if not.
+    """
+
         new_x, new_y = 0, 0
         while True:
             x, y = self.position
@@ -564,12 +579,19 @@ class Hero:
 
     def self_heal(self):
         """
-                Allow the hero to heal themselves.
+        Allow the hero to heal themselves.
 
+        Returns:
+            bool: True if the hero successfully healed, False otherwise.
 
-                Returns:
-                    bool: True if the hero successfully healed, False otherwise.
-                """
+        This function allows the hero to use a health kit to heal themselves. If the hero has remaining health kits
+        (count_heal > 0)
+        and is not already at full health (health != 5), the hero's health is increased by 1, and the count of remaining
+        health kits is decreased by 1. The function returns True to indicate a successful healing action. If the hero's
+        health is already at the maximum value of 5 or there are no more health kits available,
+        the function returns False to indicate that healing is not possible.
+        """
+
         logger.info(f'Герой {self.name} дістав аптечку, щоб поповнити здоров`є')
         if self.count_heal > 0:
             if self.health != 5:
